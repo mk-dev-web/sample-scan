@@ -667,6 +667,13 @@ function saveExpeditionMap(map) {
   localStorage.setItem("expeditionMap", JSON.stringify(map));
 }
 
+// Override fungsi saveExpeditionMap agar otomatis sync ke server
+const originalSaveExpeditionMap = saveExpeditionMap;
+saveExpeditionMap = function(map) {
+  originalSaveExpeditionMap(map);   // simpan ke localStorage dulu
+  syncExpeditionMapToServer();      // lalu kirim ke server
+};
+
 let expeditionMap = loadExpeditionMap();
 
 /* ══════════════════════════════════════════
@@ -1299,21 +1306,20 @@ input.addEventListener("keydown", e => {
       last.className = 'ok';
       setStatus('ok', 'DATA BERHASIL DISIMPAN');
       soundOk();
-      const now2 = new Date().toLocaleString("id-ID");
-      localStorage.setItem(LAST_SYNC_KEY, now2);
-      updateSyncUI();
+      // ... kode lain ...
       fetchSpreadsheetCount();
+      syncFromServer();   // <--- TAMBAHKAN INI
       setTimeout(setWaiting, 3000);
     })
     .catch(() => {
-      /* Jaringan ada tapi gagal kirim → masuk antrian */
       addToQueue(payload);
       last.className = 'ok';
       setStatus('queued', 'DISIMPAN LOKAL — AKAN DISINKRON');
       soundQueued();
       updateSyncUI();
+      syncFromServer();   // <--- TAMBAHKAN INI (opsional, agar total scan tetap update)
       setTimeout(setWaiting, 3000);
-    });
+  });
 
   input.value = "";
 });
@@ -1348,6 +1354,7 @@ updateExpeditionCountDisplay();
 updateSyncUI();
 fetchSpreadsheetCount();
 setInterval(fetchSpreadsheetCount, 30000);
+syncFromServer();
 
 /* Auto-sync tiap 60 detik jika ada antrian + online */
 setInterval(() => {
