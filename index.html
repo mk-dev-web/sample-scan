@@ -990,6 +990,71 @@ async function syncQueue() {
   updateSyncUI();
 }
 
+
+async function syncFromServer() {
+  try {
+    // 1. Ambil total scan dan hitungan per ekspedisi
+    const resAll = await fetch(`${API_URL}?action=getAllData`);
+    const dataAll = await resAll.json();
+    if (dataAll.status === "success") {
+      // Update total scan
+      totalScan = dataAll.totalScan;
+      localStorage.setItem("totalScan", totalScan);
+      counterEl.textContent = totalScan;
+      
+      // Update expeditionCounts
+      expeditionCounts = dataAll.expeditionCounts;
+      // Pastikan semua ekspedisi yang ada di map punya nilai default
+      Object.values(expeditionMap).forEach(exp => {
+        if (!expeditionCounts[exp]) expeditionCounts[exp] = 0;
+      });
+      localStorage.setItem("expeditionCounts", JSON.stringify(expeditionCounts));
+      updateExpeditionCountDisplay();
+    }
+    
+    // 2. Ambil daftar ekspedisi dari sheet Settings
+    const resMap = await fetch(`${API_URL}?action=getExpeditionMap`);
+    const dataMap = await resMap.json();
+    if (dataMap.status === "success" && Object.keys(dataMap.data).length > 0) {
+      expeditionMap = dataMap.data;
+      saveExpeditionMap(expeditionMap); // simpan ke localStorage
+      renderExpoList(); // refresh tampilan drawer
+      updateExpeditionCountDisplay();
+    }
+    
+    // 3. Update tampilan sinkronisasi
+    updateSyncUI();
+    fetchSpreadsheetCount(); // untuk menampilkan selisih
+    
+    showToast("Data berhasil disinkronkan dari server", 2000);
+  } catch (error) {
+    console.error("Gagal sync dari server:", error);
+    showToast("Gagal mengambil data dari server. Menggunakan data lokal.");
+  }
+}
+
+// Fungsi untuk menyimpan daftar ekspedisi ke server (setiap ada perubahan)
+async function syncExpeditionMapToServer() {
+  if (!isOnline) return;
+  try {
+    const response = await fetch(API_URL, {
+      method: "POST",
+      body: JSON.stringify({
+        action: "syncExpeditionMap",
+        data: expeditionMap
+      })
+    });
+    const result = await response.json();
+    if (result.status !== "success") {
+      console.warn("Gagal sync expedition map ke server");
+    } else {
+      console.log("Expedition map tersimpan ke server");
+    }
+  } catch (err) {
+    console.error("Error sync expedition map:", err);
+  }
+}
+  
 /* ══════════════════════════════════════════
    NETWORK EVENT LISTENERS
 ══════════════════════════════════════════ */
